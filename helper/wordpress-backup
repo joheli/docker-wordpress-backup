@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# load environment variables pertaining to wordpress (starting with "WORDPRESS_")
+source <(sed -r -n 's/[^#]+/export &/ p' /setup/*.env)
+
+# mysql exec common trunc
+MEXEC="mysql -h ${WORDPRESS_DB_SERVER} -P ${WORDPRESS_DB_PORT} -u${WORDPRESS_DB_USER_LIVE} -p${WORDPRESS_DB_PASSWORD_LIVE} ${WORDPRESS_DB_NAME_LIVE}"
+ 
+# function to check if database is empty; returns 0 if not empty; returns 1 if empty.
+db_empty () {
+	TABLES=$(${MEXEC} -e 'show tables' | cut -f1 | grep -v '^Tables' )
+	if [ ${#TABLES} -gt 0 ]; then
+		# database not empty
+		return 0
+	else
+		# database empty
+		return 1
+	fi
+}
+
+# check, if database is empty; if it is empty, exit!
+db_empty
+
+if [ $? -gt 0 ]; then
+	echo "$0: database ${NAME} is empty. Stopping here."
+	exit 1
+fi
+
+# timestamp
+TSTMP=$(date +"%Y%m%d_%H%M")
+
+# out files
+OUTSQL=/tmp/${TSTMP}.sql
+OUTTAR=/tmp/${TSTMP}.tar
+OUTENV=/tmp/${TSTMP}.env
+OUT7Z=/backups/${TSTMP}.7z
+
+# extract useful metadata from database and write into file
+BACKUP_SITE_URL=$(${MEXEC} -e "select option_value from wp_options where option_name='siteurl'" | cut -f1 | grep -v "^option")
+BACKUP_HOME=$(${MEXEC} -e "select option_value from wp_options where option_name='home'" | cut -f1 | grep -v "^option")
+echo "BACKUP_SITE_URL=${BACKUP_SITE_URL}" > ${OUTENV}
+echo "BACKUP_HOME=${BACKUP_HOME}" >> ${OUTENV}
+
+# append wordpress environment variables as well
+cat $WORDPRESS_ENVIRONMENT >> ${OUTENV}
+
+# dump database
+mysqldump -h ${WORDPRESS_DB_SERVER} -u${WORDPRESS_DB_USER_LIVE} -p${WORDPRESS_DB_PASSWORD_LIVE} -P${WORDPRESS_DB_PORT} ${WORDPRESS_DB_NAME_LIVE} > ${OUTSQL}
+
+# tar wordpress installation
+tar -cf ${OUTTAR} -C ${WORDPRESS_INSTALL_PATH} .
+
+# compress everything with 7z
+7zr a ${OUT7Z} ${OUTSQL} ${OUTTAR} ${OUTENV}
+
+# clean up
+rm ${OUTSQL} ${OUTTAR} ${OUTENV}
+
+# echo success
+if [ $? -eq 0 ]; then
+	echo "$0: backup was successfully created and compressed into ${OUT7Z}"
+else
+	echo "$0: there was a problem backing up wordpress into ${OUT7Z}!"
+	exit 1
+fi
+
+exit 0

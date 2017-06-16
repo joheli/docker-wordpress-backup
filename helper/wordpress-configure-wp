@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# load environment variables pertaining to wordpress (starting with "WORDPRESS_")
+source <(sed -r -n 's/[^#]+/export &/ p' /setup/*.env)
+
+# obtain fresh keys
+SALT_KEYS=/setup/fresh_salt_keys.txt
+echo "$0: attempting to obtain fresh keys from https://api.wordpress.org/secret-key/1.1/salt/"
+curl -s https://api.wordpress.org/secret-key/1.1/salt/ > $SALT_KEYS
+echo "$0: keys obtained and written to $SALT_KEYS"
+
+# extract values to be inserted later
+AUTH_KEY=$(more $SALT_KEYS | grep "define('AUTH_KEY'")
+SECURE_AUTH_KEY=$(more $SALT_KEYS | grep "define('SECURE_AUTH_KEY'")
+LOGGED_IN_KEY=$(more $SALT_KEYS | grep "define('LOGGED_IN_KEY'")
+NONCE_KEY=$(more $SALT_KEYS | grep "define('NONCE_KEY'")
+AUTH_SALT=$(more $SALT_KEYS | grep "define('AUTH_SALT'")
+SECURE_AUTH_SALT=$(more $SALT_KEYS | grep "define('SECURE_AUTH_SALT'")
+LOGGED_IN_SALT=$(more $SALT_KEYS | grep "define('LOGGED_IN_SALT'")
+NONCE_SALT=$(more $SALT_KEYS | grep "define('NONCE_SALT'")
+
+# exit if wp-config.php is not there where it should be
+if [ ! -f $WORDPRESS_INSTALL_PATH/wp-config.php ]; then
+	echo "$0: file wp-config.php is not located in ${WORDPRESS_INSTALL_PATH}!"
+	exit 1
+fi
+
+# create backup config file, if not already exists
+if [ ! -f $WORDPRESS_INSTALL_PATH/wp-config.php_old ]; then
+	echo "$0: copying wp-config.php to wp-config.php_old"
+	cp $WORDPRESS_INSTALL_PATH/wp-config.php $WORDPRESS_INSTALL_PATH/wp-config.php_old
+fi
+
+# enter all the data into the config file using the backup file as a template
+cat $WORDPRESS_INSTALL_PATH/wp-config.php_old | sed -e "/define('AUTH_KEY'/c $AUTH_KEY" \
+   -e "/define('SECURE_AUTH_KEY'/c $SECURE_AUTH_KEY" \
+   -e "/define('LOGGED_IN_KEY'/c $LOGGED_IN_KEY" \
+   -e "/define('NONCE_KEY'/c $NONCE_KEY" \
+   -e "/define('AUTH_SALT'/c $AUTH_SALT" \
+   -e "/define('SECURE_AUTH_SALT'/c $SECURE_AUTH_SALT" \
+   -e "/define('LOGGED_IN_SALT'/c $LOGGED_IN_SALT" \
+   -e "/define('NONCE_SALT'/c $NONCE_SALT" \
+   -e "/define('DB_HOST'/c define('DB_HOST', '$WORDPRESS_DB_HOST_LIVE');" \
+   -e "/define('DB_NAME'/c define('DB_NAME', '$WORDPRESS_DB_NAME_LIVE');" \
+   -e "/define('DB_USER'/c define('DB_USER', '$WORDPRESS_DB_USER_LIVE');" \
+   -e "/define('DB_PASSWORD'/c define('DB_PASSWORD', '$WORDPRESS_DB_PASSWORD_LIVE');" \
+   -e "/define('DB_COLLATE'/a\\\ndefine('FS_METHOD', 'direct');" > $WORDPRESS_INSTALL_PATH/wp-config.php
+
+# echo success
+if [ $? -eq 0 ]; then
+	echo "$0: ${WORDPRESS_INSTALL_PATH}/wp-config.php has been successfully edited."
+else
+	echo "$0: There was a problem editing ${WORDPRESS_INSTALL_PATH}/wp-config.php!"
+	exit 2
+fi
+
+exit 0
+
+
+
+
+
+
+
+
+

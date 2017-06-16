@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# load environment variables pertaining to wordpress (starting with "WORDPRESS_")
+source <(sed -r -n 's/[^#]+/export &/ p' /setup/*.env)
+
+# schedule database backup
+echo -e "${WORDPRESS_BACKUP_SCHEDULE_LIVE}\troot\twordpress-backup" >> /etc/crontab
+
+# echo success
+if [ $? -eq 0 ]; then
+	echo "$0: /etc/crontab has been successfully edited."
+else
+	echo "$0: There was a problem editing /etc/crontab!"
+	exit 1
+fi
+
+exit 0

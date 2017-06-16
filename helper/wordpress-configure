@@ -1,0 +1,59 @@
+#!/bin/bash
+set -euox pipefail
+
+# manage environment variables pertaining to wordpress
+export WORDPRESS_SUB_DIR_LIVE="${WORDPRESS_SUB_DIR:-}"
+export WORDPRESS_INSTALL_PATH="/var/www/html/${WORDPRESS_SUB_DIR_LIVE}"
+export WORDPRESS_SITE_URL_LIVE="${WORDPRESS_SITE_URL:-http://localhost/$WORDPRESS_SUB_DIR_LIVE}"
+export WORDPRESS_DB_HOST_LIVE="${WORDPRESS_DB_HOST:-db:3306}"
+export WORDPRESS_DB_NAME_LIVE="${WORDPRESS_DB_NAME:-wordpress}"
+export WORDPRESS_DB_USER_LIVE="${WORDPRESS_DB_USER:-wordpressuser}"
+export WORDPRESS_DB_PASSWORD_LIVE="${WORDPRESS_DB_PASSWORD:-password}"
+export WORDPRESS_BACKUP_SCHEDULE_LIVE="${WORDPRESS_BACKUP_SCHEDULE:-0 0 * * *}"
+export WORDPRESS_DB_SERVER="$(echo $WORDPRESS_DB_HOST_LIVE | cut -f1 -d:)"
+export WORDPRESS_DB_PORT="$(echo $WORDPRESS_DB_HOST_LIVE | cut -f2 -d:)"
+
+# export environment variables pertaining to wordpress to a file
+export WORDPRESS_ENVIRONMENT=/setup/wordpress-docker.env
+set | grep WORDPRESS > $WORDPRESS_ENVIRONMENT # if you use 'env' instead of 'set' you are fucked!
+
+# create the installation path to copy the wordpress installation to
+mkdir -p $WORDPRESS_INSTALL_PATH
+
+# call configuration scripts
+wordpress-configure-path
+wordpress-configure-wp
+wordpress-configure-cron
+
+# I don't know why this has to be removed
+rm -f /var/run/apache2/apache2.pid
+
+umask 002
+
+# deal with /var/www/html/index.html
+if [ -z $WORDPRESS_SUB_DIR_LIVE ]; then
+	mv /var/www/html/index.html /var/www/html/index.html.old
+else
+	echo "<html><head><title>hello</title></head><body>hello</body></html>" > /var/www/html/index.html
+fi
+
+# create directory /backups, if it does not exist 
+if [ ! -d /backups ]; then
+	mkdir /backups
+fi
+
+# start or restart services: cron, apache2
+service cron restart
+apache2ctl -DFOREGROUND
+
+# TODO: check: is there a backup in /backups?
+# TODO: check: does it look like a proper backup?
+# TODO: if true to both --> restore it!
+
+# TODO: create a tool to keep /backups from overflowing (i.e. to clean it out regularly)
+
+exec "$@"
+
+
+
+

@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# check
+if [ $# -lt 2 ]; then
+	echo 1>&2 "$0: Please provide both sql dump and env files."
+	exit 1
+fi
+
+# extract sql dump and env files from arguments
+SQLDUMP=$1
+ENVFILE=$2
+
+# load environment variables pertaining to wordpress (starting with "WORDPRESS_")
+source <(sed -r -n 's/[^#]+/export &/ p' /setup/*.env)
+
+# timestamp
+TSTMP=$(date +"%Y%m%d_%H%M")
+
+# extract data from backup environment file
+BACKUP_SUB_DIR=$(cat ${ENVFILE} | grep WORDqPRESS_SUB_DIR_LIVE | cut -f2 -d= )
+BACKUP_SITE_URL=$(cat ${ENVFILE} | grep BACKUP_SITE_URL | cut -f2 -d= )
+BACKUP_HOME=$(cat ${ENVFILE} | grep BACKUP_HOME | cut -f2 -d= )
+
+# mysql exec common trunc
+MEXEC="mysql -h ${WORDPRESS_DB_SERVER} -P ${WORDPRESS_DB_PORT} -u${WORDPRESS_DB_USER_LIVE} -p${WORDPRESS_DB_PASSWORD_LIVE} ${WORDPRESS_DB_NAME_LIVE}"
+ 
+# retrieve table names
+TABLES=$(${MEXEC} -e 'show tables' | cut -f1 | grep -v '^Tables' )
+
+if [ ${#TABLES} -gt 0 ]; then
+	echo "$0: Found ${#TABLES} tables in database ${WORDPRESS_DB_NAME_LIVE}."
+else
+	echo "$0: Database ${WORDPRESS_DB_NAME_LIVE} did not contain any tables."
+fi
+ 
+# delete tables one by one
+for t in $TABLES
+do
+	echo "$0: Deleting table $t from database $WORDPRESS_DB_NAME_LIVE ..."
+	${MEXEC} -e "drop table $t"
+done
+
+# restore from dump
+echo "$0: restoring database $WORDPRESS_DB_NAME_LIVE from $SQLDUMP ..."
+${MEXEC} < ${SQLDUMP}
+
+# change database if necessary
+if [ ${BACKUP_SITE_URL} != ${WORDPRESS_SITE_URL_LIVE} ]; then
+	echo "$0: attempting to change 'siteurl' from ${BACKUP_SITE_URL} to ${WORDPRESS_SITE_URL_LIVE}."
+	wp --allow-root search-replace ${BACKUP_SITE_URL} ${WORDPRESS_SITE_URL_LIVE} --path=${WORDPRESS_INSTALL_PATH}
+	echo "$0: change of 'siteurl' completed."
+fi
+
+# echo success
+if [ $? -eq 0 ]; then
+	echo "$0: database ${WORDPRESS_DB_NAME_LIVE} has successfully been restored from ${SQLDUMP}."
+else
+	echo "$0: there was a problem restoring database ${WORDPRESS_DB_NAME_LIVE} from ${SQLDUMP}!"
+	exit 1
+fi
+
+exit 0

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# load environment variables pertaining to wordpress (starting with "WORDPRESS_")
+source <(sed -r -n 's/[^#]+/export &/ p' /setup/*.env)
+
+# backup apache2.conf and insert wordpress installation pathcd
+cp /etc/apache2/apache2.conf /etc/apache2/apache2.conf_old
+cat /etc/apache2/apache2.conf_old | sed "/# AccessFileName/i <Directory $WORDPRESS_INSTALL_PATH>\\n\tAllowOverride All\\n</Directory>\\n" > /etc/apache2/apache2.conf
+
+cp -a /setup/wordpress/. $WORDPRESS_INSTALL_PATH
+
+chown -R www-data:www-data $WORDPRESS_INSTALL_PATH
+find $WORDPRESS_INSTALL_PATH -type d -exec chmod g+s {} \;
+chmod g+w $WORDPRESS_INSTALL_PATH/wp-content
+chmod -R g+w $WORDPRESS_INSTALL_PATH/wp-content/themes
+chmod -R g+w $WORDPRESS_INSTALL_PATH/wp-content/plugins
+
+# echo success
+if [ $? -eq 0 ]; then
+	echo "$0: wordpress was successfully set up in ${WORDPRESS_INSTALL_PATH}"
+else
+	echo "$0: There was a problem setting up wordpress in ${WORDPRESS_INSTALL_PATH}!"
+	exit 1
+fi
+
+exit 0
