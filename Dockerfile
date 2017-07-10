@@ -20,7 +20,9 @@ RUN apt-get -y update && apt-get install -y \
    wget
 
 RUN cp /etc/apache2/conf-available/security.conf /etc/apache2/conf-available/security_old.conf; \
-   cat /etc/apache2/conf-available/security.conf | sed 's#ServerTokens OS#ServerTokens Prod#g' | sed 's#ServerSignature On#ServerSignature Off#g' > security.conf; \
+   cat /etc/apache2/conf-available/security.conf | sed -e 's#ServerTokens OS#ServerTokens Prod#g' -e 's#ServerSignature On#ServerSignature Off#g' > security.conf; \
+   cat /etc/apache2/apache2.conf | sed "s#Timeout 300#Timeout 30#g" > apache2.conf; \
+   mv apache2.conf /etc/apache2/apache2.conf; \
    mv security.conf /etc/apache2/conf-available/security.conf
 
 WORKDIR /setup
@@ -41,9 +43,3 @@ COPY helper/wordpress-* /usr/bin/
 RUN chmod 700 /usr/bin/wordpress-*
 
 ENTRYPOINT ["wordpress-configure"]
-
-   
-
-
-
-
