@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# load environment variables pertaining to wordpress (starting with "WORDPRESS_")
+source <(sed -r -n 's/[^#]+/export &/ p' /setup/*.env)
+
+FILE_COUNT=$(ls ${WORDPRESS_BACKUP_DIR} | wc -l)
+
+if [ ${FILE_COUNT} -gt ${WORDPRESS_BACKUP_MIN_FILES} ]; then
+	find ${WORDPRESS_BACKUP_DIR} -mtime +${WORDPRESS_BACKUP_CLEAN_DAYS} -exec rm {} \;
+fi
+
+exit 0
+

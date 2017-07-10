@@ -3,10 +3,6 @@
 # load environment variables pertaining to wordpress (starting with "WORDPRESS_")
 source <(sed -r -n 's/[^#]+/export &/ p' /setup/*.env)
 
-# backup apache2.conf and insert wordpress installation pathcd
-cp /etc/apache2/apache2.conf /etc/apache2/apache2.conf_old
-cat /etc/apache2/apache2.conf_old | sed "/# AccessFileName/i <Directory $WORDPRESS_INSTALL_PATH>\\n\tAllowOverride All\\n</Directory>\\n" > /etc/apache2/apache2.conf
-
 cp -a /setup/wordpress/. $WORDPRESS_INSTALL_PATH
 
 chown -R www-data:www-data $WORDPRESS_INSTALL_PATH

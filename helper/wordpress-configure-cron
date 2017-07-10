@@ -3,8 +3,9 @@
 # load environment variables pertaining to wordpress (starting with "WORDPRESS_")
 source <(sed -r -n 's/[^#]+/export &/ p' /setup/*.env)
 
-# schedule database backup
-echo -e "${WORDPRESS_BACKUP_SCHEDULE_LIVE}\troot\twordpress-backup" >> /etc/crontab
+# schedule backup purge and database backup
+echo -e "${WORDPRESS_BACKUP_SCHEDULE}\troot\twordpress-purge-backups" >> /etc/crontab && \
+   echo -e "${WORDPRESS_BACKUP_SCHEDULE}\troot\twordpress-backup" >> /etc/crontab
 
 # echo success
 if [ $? -eq 0 ]; then

@@ -40,10 +40,10 @@ cat $WORDPRESS_INSTALL_PATH/wp-config.php_old | sed -e "/define('AUTH_KEY'/c $AU
    -e "/define('SECURE_AUTH_SALT'/c $SECURE_AUTH_SALT" \
    -e "/define('LOGGED_IN_SALT'/c $LOGGED_IN_SALT" \
    -e "/define('NONCE_SALT'/c $NONCE_SALT" \
-   -e "/define('DB_HOST'/c define('DB_HOST', '$WORDPRESS_DB_HOST_LIVE');" \
-   -e "/define('DB_NAME'/c define('DB_NAME', '$WORDPRESS_DB_NAME_LIVE');" \
-   -e "/define('DB_USER'/c define('DB_USER', '$WORDPRESS_DB_USER_LIVE');" \
-   -e "/define('DB_PASSWORD'/c define('DB_PASSWORD', '$WORDPRESS_DB_PASSWORD_LIVE');" \
+   -e "/define('DB_HOST'/c define('DB_HOST', '$WORDPRESS_DB_HOST');" \
+   -e "/define('DB_NAME'/c define('DB_NAME', '$WORDPRESS_DB_NAME');" \
+   -e "/define('DB_USER'/c define('DB_USER', '$WORDPRESS_DB_USER');" \
+   -e "/define('DB_PASSWORD'/c define('DB_PASSWORD', '$WORDPRESS_DB_PASSWORD');" \
    -e "/define('DB_COLLATE'/a\\\ndefine('FS_METHOD', 'direct');" > $WORDPRESS_INSTALL_PATH/wp-config.php
 
 # echo success

@@ -1,56 +1,77 @@
 #!/bin/bash
 set -euox pipefail
 
-# manage environment variables pertaining to wordpress
-export WORDPRESS_SUB_DIR_LIVE="${WORDPRESS_SUB_DIR:-}"
-export WORDPRESS_INSTALL_PATH="/var/www/html/${WORDPRESS_SUB_DIR_LIVE}"
-export WORDPRESS_SITE_URL_LIVE="${WORDPRESS_SITE_URL:-http://localhost/$WORDPRESS_SUB_DIR_LIVE}"
-export WORDPRESS_DB_HOST_LIVE="${WORDPRESS_DB_HOST:-db:3306}"
-export WORDPRESS_DB_NAME_LIVE="${WORDPRESS_DB_NAME:-wordpress}"
-export WORDPRESS_DB_USER_LIVE="${WORDPRESS_DB_USER:-wordpressuser}"
-export WORDPRESS_DB_PASSWORD_LIVE="${WORDPRESS_DB_PASSWORD:-password}"
-export WORDPRESS_BACKUP_SCHEDULE_LIVE="${WORDPRESS_BACKUP_SCHEDULE:-0 0 * * *}"
-export WORDPRESS_DB_SERVER="$(echo $WORDPRESS_DB_HOST_LIVE | cut -f1 -d:)"
-export WORDPRESS_DB_PORT="$(echo $WORDPRESS_DB_HOST_LIVE | cut -f2 -d:)"
+# set environment variables pertaining to wordpress
+export WORDPRESS_SUB_DIR="${WORDPRESS_SUB_DIR:-wordpress}"
+export WORDPRESS_SITE_NAME=${WORDPRESS_SUB_DIR}
+export WORDPRESS_INSTALL_PATH="/var/www/${WORDPRESS_SUB_DIR}"
+export WORDPRESS_SITE_URL="${WORDPRESS_SITE_URL:-http://localhost}"
+export WORDPRESS_DB_HOST="${WORDPRESS_DB_HOST:-db:3306}"
+export WORDPRESS_DB_NAME="${WORDPRESS_DB_NAME:-wordpress}"
+export WORDPRESS_DB_USER="${WORDPRESS_DB_USER:-wordpressuser}"
+export WORDPRESS_DB_PASSWORD="${WORDPRESS_DB_PASSWORD:-password}"
+export WORDPRESS_BACKUP_SCHEDULE="${WORDPRESS_BACKUP_SCHEDULE:-0 0 * * *}"
+export WORDPRESS_DB_SERVER="$(echo $WORDPRESS_DB_HOST | cut -f1 -d:)"
+export WORDPRESS_DB_PORT="$(echo $WORDPRESS_DB_HOST | cut -f2 -d:)"
+export WORDPRESS_BACKUP_CLEAN_DAYS=${WORDPRESS_BACKUP_CLEAN_DAYS:-7}
+export WORDPRESS_BACKUP_MIN_FILES=${WORDPRESS_BACKUP_MIN_FILES:-3}
+export WORDPRESS_BACKUP_DIR=${WORDPRESS_BACKUP_DIR:-/backups}
+export WORDPRESS_ENVIRONMENT=/setup/wordpress-docker.env
 
 # export environment variables pertaining to wordpress to a file
-export WORDPRESS_ENVIRONMENT=/setup/wordpress-docker.env
-set | grep WORDPRESS > $WORDPRESS_ENVIRONMENT # if you use 'env' instead of 'set' you are fucked!
+set | grep ^WORDPRESS_ > ${WORDPRESS_ENVIRONMENT} 
+
+# restorecheck: returns "yes" if there is something to restore
+restorecheck () {
+	local RESULT="yes"
+	# the following line generates an error, god knows why...
+	if [ ! -d ${WORDPRESS_BACKUP_DIR} ]; then
+		RESULT="no"
+	fi
+
+	if [ $(ls -1A ${WORDPRESS_BACKUP_DIR}/*7z | wc -l) -eq 0 ]; then
+		RESULT="no"
+	fi
+
+	echo $RESULT
+}
 
 # create the installation path to copy the wordpress installation to
 mkdir -p $WORDPRESS_INSTALL_PATH
 
-# call configuration scripts
-wordpress-configure-path
+# backup apache2.conf, create site configuration
+cp /etc/apache2/apache2.conf /etc/apache2/apache2.conf_old
+SITECONF=/etc/apache2/sites-available/${WORDPRESS_SITE_NAME}.conf
+cp /etc/apache2/sites-available/000-default.conf ${SITECONF}
+cat /etc/apache2/sites-available/000-default.conf | sed -e "s#/var/www/html#${WORDPRESS_INSTALL_PATH}#g" -e "/DocumentRoot/a \\\t<Directory $WORDPRESS_INSTALL_PATH>\n\t\tOptions Indexes FollowSymLinks MultiViews\n\t\tAllowOverride All\n\t\tOrder allow,deny\n\t\tallow from all\n\t</Directory>" > ${SITECONF}
+
+# is there something to restore?
+if [ "$(restorecheck)" == "yes" ]; then
+	# yes? then restore it!
+	echo "$0: at least one backup file was found in ${WORDPRESS_BACKUP_DIR}! Attempting to restore ..."
+	wordpress-restore
+else
+	# no? then install naked wordpress
+	echo "$0: no backup file was found in ${WORDPRESS_BACKUP_DIR}! Setting up a fresh install ..."
+	wordpress-configure-path
+fi
+
+# activate site configuration
+a2dissite 000-default
+a2ensite ${WORDPRESS_SITE_NAME}
+
+# go on configuring the rest
 wordpress-configure-wp
 wordpress-configure-cron
 
-# I don't know why this has to be removed
-rm -f /var/run/apache2/apache2.pid
-
-umask 002
-
-# deal with /var/www/html/index.html
-if [ -z $WORDPRESS_SUB_DIR_LIVE ]; then
-	mv /var/www/html/index.html /var/www/html/index.html.old
-else
-	echo "<html><head><title>hello</title></head><body>hello</body></html>" > /var/www/html/index.html
-fi
-
 # create directory /backups, if it does not exist 
-if [ ! -d /backups ]; then
-	mkdir /backups
+if [ ! -d ${WORDPRESS_BACKUP_DIR} ]; then
+	mkdir -p ${WORDPRESS_BACKUP_DIR}
 fi
 
 # start or restart services: cron, apache2
 service cron restart
 apache2ctl -DFOREGROUND
-
-# TODO: check: is there a backup in /backups?
-# TODO: check: does it look like a proper backup?
-# TODO: if true to both --> restore it!
-
-# TODO: create a tool to keep /backups from overflowing (i.e. to clean it out regularly)
 
 exec "$@"
 

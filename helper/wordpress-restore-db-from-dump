@@ -17,46 +17,62 @@ source <(sed -r -n 's/[^#]+/export &/ p' /setup/*.env)
 TSTMP=$(date +"%Y%m%d_%H%M")
 
 # extract data from backup environment file
-BACKUP_SUB_DIR=$(cat ${ENVFILE} | grep WORDqPRESS_SUB_DIR_LIVE | cut -f2 -d= )
+BACKUP_SUB_DIR=$(cat ${ENVFILE} | grep WORDPRESS_SUB_DIR | cut -f2 -d= )
 BACKUP_SITE_URL=$(cat ${ENVFILE} | grep BACKUP_SITE_URL | cut -f2 -d= )
 BACKUP_HOME=$(cat ${ENVFILE} | grep BACKUP_HOME | cut -f2 -d= )
 
 # mysql exec common trunc
-MEXEC="mysql -h ${WORDPRESS_DB_SERVER} -P ${WORDPRESS_DB_PORT} -u${WORDPRESS_DB_USER_LIVE} -p${WORDPRESS_DB_PASSWORD_LIVE} ${WORDPRESS_DB_NAME_LIVE}"
+MEXEC="mysql -h ${WORDPRESS_DB_SERVER} -P ${WORDPRESS_DB_PORT} -u${WORDPRESS_DB_USER} -p${WORDPRESS_DB_PASSWORD} ${WORDPRESS_DB_NAME}"
  
 # retrieve table names
 TABLES=$(${MEXEC} -e 'show tables' | cut -f1 | grep -v '^Tables' )
 
 if [ ${#TABLES} -gt 0 ]; then
-	echo "$0: Found ${#TABLES} tables in database ${WORDPRESS_DB_NAME_LIVE}."
+	echo "$0: Found ${#TABLES} tables in database ${WORDPRESS_DB_NAME}."
+	# delete tables one by one
+	for t in $TABLES
+	do
+		echo "$0: Deleting table $t from database $WORDPRESS_DB_NAME ..."
+		${MEXEC} -e "drop table $t"
+	done
 else
-	echo "$0: Database ${WORDPRESS_DB_NAME_LIVE} did not contain any tables."
+	echo "$0: Database ${WORDPRESS_DB_NAME} did not contain any tables. No change neces"
 fi
- 
-# delete tables one by one
-for t in $TABLES
-do
-	echo "$0: Deleting table $t from database $WORDPRESS_DB_NAME_LIVE ..."
-	${MEXEC} -e "drop table $t"
-done
+
+# Problem?
+if [ $? -ne 0 ]; then
+	echo "$0: there was a problem deleting the old tables!"
+	exit 3
+fi
 
 # restore from dump
-echo "$0: restoring database $WORDPRESS_DB_NAME_LIVE from $SQLDUMP ..."
+echo "$0: restoring database $WORDPRESS_DB_NAME from $SQLDUMP ..."
 ${MEXEC} < ${SQLDUMP}
 
+# Problem?
+if [ $? -ne 0 ]; then
+	echo "$0: there was a problem with restoring database $WORDPRESS_DB_NAME from $SQLDUMP!"
+	exit 4
+fi
+
 # change database if necessary
-if [ ${BACKUP_SITE_URL} != ${WORDPRESS_SITE_URL_LIVE} ]; then
-	echo "$0: attempting to change 'siteurl' from ${BACKUP_SITE_URL} to ${WORDPRESS_SITE_URL_LIVE}."
-	wp --allow-root search-replace ${BACKUP_SITE_URL} ${WORDPRESS_SITE_URL_LIVE} --path=${WORDPRESS_INSTALL_PATH}
+if [ ${BACKUP_SITE_URL} != ${WORDPRESS_SITE_URL} ]; then
+	echo "$0: attempting to change 'siteurl' from ${BACKUP_SITE_URL} to ${WORDPRESS_SITE_URL}."
+	wp --allow-root search-replace ${BACKUP_SITE_URL} ${WORDPRESS_SITE_URL} --path=${WORDPRESS_INSTALL_PATH}
+	# Problem?
+	if [ $? -ne 0 ]; then
+		echo "$0: there was a problem with changing 'siteurl'!"
+		exit 5
+	fi
 	echo "$0: change of 'siteurl' completed."
 fi
 
 # echo success
 if [ $? -eq 0 ]; then
-	echo "$0: database ${WORDPRESS_DB_NAME_LIVE} has successfully been restored from ${SQLDUMP}."
+	echo "$0: database ${WORDPRESS_DB_NAME} has successfully been restored from ${SQLDUMP}."
 else
-	echo "$0: there was a problem restoring database ${WORDPRESS_DB_NAME_LIVE} from ${SQLDUMP}!"
-	exit 1
+	echo "$0: there was a problem restoring database ${WORDPRESS_DB_NAME} from ${SQLDUMP}!"
+	exit 6
 fi
 
 exit 0
