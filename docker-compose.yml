@@ -13,7 +13,7 @@ services:
    wordpress:
      depends_on:
        - db
-     image: wp:08
+     image: johanneselias/wordpress-backup
      volumes: 
        - ./backups:/backups
      ports:
