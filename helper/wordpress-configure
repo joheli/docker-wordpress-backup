@@ -17,6 +17,7 @@ export WORDPRESS_BACKUP_CLEAN_DAYS=${WORDPRESS_BACKUP_CLEAN_DAYS:-7}
 export WORDPRESS_BACKUP_MIN_FILES=${WORDPRESS_BACKUP_MIN_FILES:-3}
 export WORDPRESS_BACKUP_DIR=${WORDPRESS_BACKUP_DIR:-/backups}
 export WORDPRESS_ENVIRONMENT=/setup/wordpress-docker.env
+export WORDPRESS_DEBUG=${WORDPRESS_DEBUG:-no}
 
 # export environment variables pertaining to wordpress to a file
 set | grep ^WORDPRESS_ > ${WORDPRESS_ENVIRONMENT} 
@@ -37,7 +38,11 @@ restorecheck () {
 }
 
 # create the installation path to copy the wordpress installation to
-mkdir -p $WORDPRESS_INSTALL_PATH
+mkdir -p ${WORDPRESS_INSTALL_PATH}
+# create directory /backups, if it does not exist 
+if [ ! -d ${WORDPRESS_BACKUP_DIR} ]; then
+	mkdir -p ${WORDPRESS_BACKUP_DIR}
+fi
 
 # backup apache2.conf, create site configuration
 cp /etc/apache2/apache2.conf /etc/apache2/apache2.conf_old
@@ -49,7 +54,9 @@ cat /etc/apache2/sites-available/000-default.conf | sed -e "s#/var/www/html#${WO
 if [ "$(restorecheck)" == "yes" ]; then
 	# yes? then restore it!
 	echo "$0: at least one backup file was found in ${WORDPRESS_BACKUP_DIR}! Attempting to restore ..."
-	wordpress-restore
+	if [ "${WORDPRESS_DEBUG}" == "no" ]; then
+		wordpress-restore
+	fi
 else
 	# no? then install naked wordpress
 	echo "$0: no backup file was found in ${WORDPRESS_BACKUP_DIR}! Setting up a fresh install ..."
@@ -59,22 +66,17 @@ fi
 # activate site configuration
 a2dissite 000-default
 a2ensite ${WORDPRESS_SITE_NAME}
+a2enmod rewrite
 
 # go on configuring the rest
-wordpress-configure-wp
-wordpress-configure-cron
-
-# create directory /backups, if it does not exist 
-if [ ! -d ${WORDPRESS_BACKUP_DIR} ]; then
-	mkdir -p ${WORDPRESS_BACKUP_DIR}
+if [ "${WORDPRESS_DEBUG}" == "no" ]; then
+	wordpress-configure-wp
+	wordpress-configure-cron
+	service cron restart
 fi
 
 # start or restart services: cron, apache2
-service cron restart
 apache2ctl -DFOREGROUND
 
 exec "$@"
-
-
-
 

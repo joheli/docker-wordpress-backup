@@ -36,7 +36,7 @@ if [ ${#TABLES} -gt 0 ]; then
 		${MEXEC} -e "drop table $t"
 	done
 else
-	echo "$0: Database ${WORDPRESS_DB_NAME} did not contain any tables. No change neces"
+	echo "$0: Database ${WORDPRESS_DB_NAME} did not contain any tables. No change necessary."
 fi
 
 # Problem?
@@ -58,8 +58,8 @@ fi
 # change database if necessary
 if [ ${BACKUP_SITE_URL} != ${WORDPRESS_SITE_URL} ]; then
 	echo "$0: attempting to change 'siteurl' from ${BACKUP_SITE_URL} to ${WORDPRESS_SITE_URL}."
-	#wp --allow-root search-replace ${BACKUP_SITE_URL} ${WORDPRESS_SITE_URL} --path=${WORDPRESS_INSTALL_PATH}
-	wp option update home '${WORDPRESS_SITE_URL}' && wp option update siteurl '${WORDPRESS_SITE_URL}'
+	# wp --allow-root search-replace ${BACKUP_SITE_URL} ${WORDPRESS_SITE_URL} --path=${WORDPRESS_INSTALL_PATH}
+	wp --allow-root --path=${WORDPRESS_INSTALL_PATH} option update home ${WORDPRESS_SITE_URL} && wp --allow-root --path=${WORDPRESS_INSTALL_PATH} option update siteurl ${WORDPRESS_SITE_URL} 
 	# Problem?
 	if [ $? -ne 0 ]; then
 		echo "$0: there was a problem with changing 'siteurl'!"

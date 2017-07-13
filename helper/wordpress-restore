@@ -84,15 +84,6 @@ fi
 
 # pass files to restore scripts
 if [ "$DEBUG" == false ]; then
-	# restore db
-        wordpress-restore-db-from-dump ${EXTRACTDIR}/*.sql ${EXTRACTDIR}/*.env
-	# Problem?
-	if [ $? -ne 0 ]; then
-		echo "$0: there was a problem with processing sql dump files from ${EXTRACTDIR}!"
-		cleanup ${EXTRACTDIR}
-		exit 7
-	fi
-
 	# remove and recreate install directory
 	if [ -d ${WORDPRESS_INSTALL_PATH} ]; then
 		rm -R ${WORDPRESS_INSTALL_PATH}
@@ -130,9 +121,18 @@ if [ "$DEBUG" == false ]; then
 			echo "$0: wordpress backup has successfully been restored from $BACKUPFILE."
 		fi
 	fi
-fi
+	
+	# restore db
+        wordpress-restore-db-from-dump ${EXTRACTDIR}/*.sql ${EXTRACTDIR}/*.env
+	# Problem?
+	if [ $? -ne 0 ]; then
+		echo "$0: there was a problem with processing sql dump files from ${EXTRACTDIR}!"
+		cleanup ${EXTRACTDIR}
+		exit 7
+	fi
 
-cleanup ${EXTRACTDIR}
+	cleanup ${EXTRACTDIR}
+fi
 
 exit 0
 
