@@ -43,3 +43,9 @@ COPY helper/wordpress-* /usr/bin/
 RUN chmod 700 /usr/bin/wordpress-*
 
 ENTRYPOINT ["wordpress-configure"]
+
+   
+
+
+
+

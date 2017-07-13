@@ -26,3 +26,5 @@ services:
        WORDPRESS_DB_NAME: testData
        WORDPRESS_DB_PASSWORD: userSecret
        WORDPRESS_BACKUP_SCHEDULE: "0 0 * * *"
+       WORDPRESS_DEBUG: "no"
+
