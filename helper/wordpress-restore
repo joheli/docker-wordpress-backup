@@ -10,8 +10,6 @@ help () {
 	echo -e "      -d         debug mode - only extract files"
 	echo -e "      -f [File]  supply specific file to restore"
 	echo -e "      -h         print this help"
-	echo -e "      -i         init mode - do not run wordpress-config-wp" 
-	echo -e "                 (-i is incompatible with -d)\n"
 }
 
 # clean up
@@ -27,7 +25,7 @@ DEBUG=false
 INIT=false
 
 # get options for debug and use a specific backup file
-while getopts "df:hi" OPTION; do
+while getopts "df:h" OPTION; do
         case $OPTION in
                 d)
                         DEBUG=true
@@ -42,9 +40,6 @@ while getopts "df:hi" OPTION; do
 		h)
 			help
 			exit 2
-			;;
-		i)	
-			INIT=true
 			;;
 			
                 \?)
@@ -110,25 +105,24 @@ if [ "$DEBUG" == false ]; then
 		exit 9
 	fi
 
-	# configure wordpress (unless in "init mode")
-	if [ "$INIT" == false ]; then
-		wordpress-configure-wp
-		# Problem?
-		if [ $? -ne 0 ]; then
-			echo "$0: there was a problem with configuring worpress files using wordpress-configure-wp!"
-			exit 10
-		else 
-			echo "$0: wordpress backup has successfully been restored from $BACKUPFILE."
-		fi
+	# configure wordpress 
+	wordpress-configure-wp
+	# Problem?
+	if [ $? -ne 0 ]; then
+		echo "$0: there was a problem with configuring worpress files using wordpress-configure-wp!"
+		exit 10
 	fi
+
 	
 	# restore db
-        wordpress-restore-db-from-dump ${EXTRACTDIR}/*.sql ${EXTRACTDIR}/*.env
+        wordpress-restore-db-from-dump ${EXTRACTDIR}/*.sql
 	# Problem?
 	if [ $? -ne 0 ]; then
 		echo "$0: there was a problem with processing sql dump files from ${EXTRACTDIR}!"
 		cleanup ${EXTRACTDIR}
 		exit 7
+	else 
+		echo "$0: wordpress backup has successfully been restored from $BACKUPFILE."
 	fi
 
 	cleanup ${EXTRACTDIR}
