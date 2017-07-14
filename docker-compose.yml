@@ -14,7 +14,7 @@ services:
    wordpress:
      depends_on:
        - db
-     image: wp:08
+     image: johanneselias/wordpress-backup
      container_name: wp_front
      volumes: 
        - ./backups:/backups
